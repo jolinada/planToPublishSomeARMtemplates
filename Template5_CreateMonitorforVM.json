@@ -1,0 +1,376 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "retentionInDays": {
+            "type": "int",
+            "defaultValue": 30,
+            "metadata": {
+                "description": "ワークスペースデータの保持期間(30 ～ 730 日)"
+            }
+        },
+        "VmResourceId": {
+            "type": "String",
+            "metadata": {
+                "description": "監視する仮想マシンのResourceID"
+            }
+        },
+        "osType": {
+            "type": "String",
+            "defaultValue": "Windows"
+        },
+        "alertEmail": {
+            "type": "string",
+            "defaultValue": "seizen.ra@unisys.co.jp",
+            "metadata": {
+                "description": "監視アラート通知先のメールアドレス1"
+            }
+        },
+        "alertEmai2": {
+            "type": "string",
+            "defaultValue": "jolin.ada.11@gmail.com",
+            "metadata": {
+                "description": "監視アラート通知先のメールアドレス2"
+            }
+        }
+    },
+    "variables": {
+        "existingdiagnosticsStorageAccountName": "[concat(uniquestring(resourceGroup().id), '0archibus')]",
+        "accountid": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/','Microsoft.Storage/storageAccounts/', variables('existingdiagnosticsStorageAccountName'))]",
+        "WorkspaceName": "[concat(uniquestring(resourceGroup().id), '0archibusWorkspace')]",
+        "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]",
+        "VmName": "[split(parameters('VmResourceId'),'/')[8]]",
+        "DaExtensionName": "[if(equals(toLower(parameters('osType')), 'windows'), 'DependencyAgentWindows', 'DependencyAgentLinux')]",
+        "DaExtensionType": "[if(equals(toLower(parameters('osType')), 'windows'), 'DependencyAgentWindows', 'DependencyAgentLinux')]",
+        "DaExtensionVersion": "9.5",
+        "MmaExtensionName": "[if(equals(toLower(parameters('osType')), 'windows'), 'MMAExtension', 'OMSExtension')]",
+        "MmaExtensionType": "[if(equals(toLower(parameters('osType')), 'windows'), 'MicrosoftMonitoringAgent', 'OmsAgentForLinux')]",
+        "MmaExtensionVersion": "[if(equals(toLower(parameters('osType')), 'windows'), '1.0', '1.4')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "name": "[variables('WorkspaceName')]",
+            "apiVersion": "2020-03-01-preview",
+            "location": "japaneast",
+            "properties": {
+                "sku": {
+                    "name": "pergb2018"
+                },
+                "retentionInDays": "[parameters('retentionInDays')]",
+                "features": {
+                    "searchVersion": 1,
+                    "legacy": 0,
+                    "enableLogAccessUsingOnlyResourcePermissions": true
+                }
+            },
+            "resources": [
+                {
+                    "type": "datasources",
+                    "apiVersion": "2020-03-01-preview",
+                    "name": "WindowsEventsSystem",
+                    "dependsOn": [
+                        "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+                    ],
+                    "kind": "WindowsEvent",
+                    "properties": {
+                        "eventLogName": "System",
+                        "eventTypes": [
+                            {
+                                "eventType": "Error"
+                            },
+                            {
+                                "eventType": "Warning"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "datasources",
+                    "apiVersion": "2020-03-01-preview",
+                    "name": "WindowsEventsApplication",
+                    "dependsOn": [
+                        "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+                    ],
+                    "kind": "WindowsEvent",
+                    "properties": {
+                        "eventLogName": "Application",
+                        "eventTypes": [
+                            {
+                                "eventType": "Error"
+                            },
+                            {
+                                "eventType": "Warning"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "datasources",
+                    "apiVersion": "2020-03-01-preview",
+                    "name": "WindowsPerfMemoryAvailableBytes",
+                    "dependsOn": [
+                        "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+                    ],
+                    "kind": "WindowsPerformanceCounter",
+                    "properties": {
+                        "objectName": "Memory",
+                        "instanceName": "*",
+                        "intervalSeconds": 60,
+                        "counterName": "Available MBytes "
+                    }
+                },
+                {
+                    "type": "datasources",
+                    "apiVersion": "2020-03-01-preview",
+                    "name": "WindowsPerfLogicalDiskFreeSpacePercentage",
+                    "dependsOn": [
+                        "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+                    ],
+                    "kind": "WindowsPerformanceCounter",
+                    "properties": {
+                        "objectName": "LogicalDisk",
+                        "instanceName": "*",
+                        "intervalSeconds": 60,
+                        "counterName": "% Free Space"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Insights/actionGroups",
+            "apiVersion": "2019-03-01",
+            "name": "ArchibusActionGroupbyEMail",
+            "location": "Global",
+            "properties": {
+                "groupShortName": "MonitorAlert",
+                "enabled": true,
+                "emailReceivers": [
+                    {
+                        "name": "Email1",
+                        "emailAddress": "[parameters('alertEmail')]"
+                    },
+                    {
+                        "name": "Email2",
+                        "emailAddress": "[parameters('alertEmai2')]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2019-07-01",
+            "name": "[concat(variables('VmName'), '/Microsoft.Insights.VMDiagnosticsSettings')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Azure.Diagnostics",
+                "type": "IaaSDiagnostics",
+                "typeHandlerVersion": "1.5",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "StorageAccount": "[variables('existingdiagnosticsStorageAccountName')]",
+                    "WadCfg": {
+                        "DiagnosticMonitorConfiguration": {
+                            "overallQuotaInMB": 10000,
+                            "Metrics": {
+                                "resourceId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/', 'Microsoft.Compute/virtualMachines/', variables('VmName'))]",
+                                "MetricAggregation": [
+                                    {
+                                        "scheduledTransferPeriod": "PT1H"
+                                    },
+                                    {
+                                        "scheduledTransferPeriod": "PT1M"
+                                    }
+                                ]
+                            },
+                            "DiagnosticInfrastructureLogs": {
+                                "scheduledTransferLogLevelFilter": "Error"
+                            },
+                            "PerformanceCounters": {
+                                "scheduledTransferPeriod": "PT1M",
+                                "sinks": "AzureMonitorSink",
+                                "PerformanceCounterConfiguration": [
+                                    {
+                                        "counterSpecifier": "\\Memory\\% Committed Bytes In Use",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\Memory\\Available Bytes",
+                                        "unit": "Bytes",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\Memory\\Committed Bytes",
+                                        "unit": "Bytes",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Time",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Read Time",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Write Time",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\% Idle Time",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\% Free Space",
+                                        "unit": "Percent",
+                                        "sampleRate": "PT1M"
+                                    },
+                                    {
+                                        "counterSpecifier": "\\LogicalDisk(_Total)\\Free Megabytes",
+                                        "unit": "Count",
+                                        "sampleRate": "PT1M"
+                                    }
+                                ]
+                            },
+                            "WindowsEventLog": {
+                                "scheduledTransferPeriod": "PT5M",
+                                "DataSource": [
+                                    {
+                                        "name": "Application!*[System[(Level = 1 or Level = 2 or Level = 3)]]"
+                                    },
+                                    {
+                                        "name": "Security!*[System[band(Keywords,4503599627370496)]]"
+                                    },
+                                    {
+                                        "name": "System!*[System[(Level = 1 or Level = 2 or Level = 3)]]"
+                                    },
+                                    {
+                                        "name": "System!*[System[Provider[@Name='Microsoft Antimalware']]]"
+                                    },
+                                    {
+                                        "name": "System!*[System[Provider[@Name='NTFS'] and (EventID=55)]]"
+                                    },
+                                    {
+                                        "name": "System!*[System[Provider[@Name='disk'] and (EventID=7 or EventID=52 or EventID=55)]]"
+                                    }
+                                ]
+                            },
+                            "SinksConfig": {
+                                "Sink": [
+                                    {
+                                        "name": "AzureMonitorSink",
+                                        "AzureMonitor": {
+                                            "ResourceId": "[variables('workspaceResourceId')]"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "protectedSettings": {
+                    "storageAccountName": null,
+                    "storageAccountKey": null,
+                    "storageAccountEndPoint": null
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2018-10-01",
+            "name": "[concat(variables('VmName'), '/ManagedIdentityExtensionForWindows')]",
+            "location": "japaneast",
+            "properties": {
+                "publisher": "Microsoft.ManagedIdentity",
+                "type": "ManagedIdentityExtensionForWindows",
+                "typeHandlerVersion": "1.0",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "port": 50342
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "VMISolutionDeployment",
+            "dependsOn": [
+                "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('VmName'), '/extensions/', 'Microsoft.Insights.VMDiagnosticsSettings')]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2015-11-01-preview",
+                            "type": "Microsoft.OperationsManagement/solutions",
+                            "location": "japaneast",
+                            "name": "[concat('VMInsights', '(', split(variables('workspaceResourceId'),'/')[8], ')')]",
+                            "properties": {
+                                "workspaceResourceId": "[variables('WorkspaceResourceId')]"
+                            },
+                            "plan": {
+                                "name": "[concat('VMInsights', '(', split(variables('workspaceResourceId'),'/')[8], ')')]",
+                                "product": "[concat('OMSGallery/', 'VMInsights')]",
+                                "promotionCode": "",
+                                "publisher": "Microsoft"
+                            }
+                        }
+                    ]
+                }
+            },
+            "subscriptionId": "[split(variables('workspaceResourceId'),'/')[2]]",
+            "resourceGroup": "[split(variables('workspaceResourceId'),'/')[4]]"
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2018-10-01",
+            "name": "[concat(variables('VmName'), '/', variables('DaExtensionName'))]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]",
+                "[concat('Microsoft.Resources/deployments/', 'VMISolutionDeployment')]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Azure.Monitoring.DependencyAgent",
+                "type": "[variables('DaExtensionType')]",
+                "typeHandlerVersion": "[variables('DaExtensionVersion')]",
+                "autoUpgradeMinorVersion": true
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2018-10-01",
+            "name": "[concat(variables('VmName'), '/', variables('MmaExtensionName'))]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[concat('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                "type": "[variables('MmaExtensionType')]",
+                "typeHandlerVersion": "[variables('MmaExtensionVersion')]",
+                "autoUpgradeMinorVersion": "true",
+                "settings": {
+                    "workspaceId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName')), '2015-03-20').customerId]",
+                    "azureResourceId": "[parameters('VmResourceId')]",
+                    "stopOnMultipleConnections": "true"
+                },
+                "protectedSettings": {
+                    "workspaceKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName')), '2015-03-20').primarySharedKey]"
+                }
+            }
+        }
+    ]
+}

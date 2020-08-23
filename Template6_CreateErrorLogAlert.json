@@ -1,0 +1,42 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "variables": {
+        "WorkspaceName": "[concat(uniquestring(resourceGroup().id), '0archibusWorkspace')]",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/', variables('WorkspaceName'))]",
+        "actionGroupId": "[resourceId('Microsoft.OperationalInsights/workspaces/', 'ArchibusActionGroupbyEMail')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Insights/scheduledQueryRules",
+            "name": "Windows event log query alert",
+            "apiVersion": "2018-04-16",
+            "location": "japaneast",
+            "properties": {
+                "description": "Windows event log query alert from workspace",
+                "enabled": "true",
+                "source": {
+                    "query": "Event | where EventLevelName == \"Error\" | summarize count() by Computer",
+                    "dataSourceId": "[variables('WorkspaceResourceId')]",
+                    "queryType": "ResultCount"
+                },
+                "schedule": {
+                    "frequencyInMinutes": 10,
+                    "timeWindowInMinutes": 10
+                },
+                "action": {
+                    "odata.type": "Microsoft.WindowsAzure.Management.Monitoring.Alerts.Models.Microsoft.AppInsights.Nexus.DataContracts.Resources.ScheduledQueryRules.AlertingAction",
+                    "severity": "4",
+                    "aznsAction": {
+                        "actionGroup": "[array(variables('actionGroupId'))]",
+                        "emailSubject": "[アラート] VMのイベントログ"
+                    },
+                    "trigger": {
+                        "thresholdOperator": "GreaterThan",
+                        "threshold": 0
+                    }
+                }
+            }
+        }
+    ]
+}

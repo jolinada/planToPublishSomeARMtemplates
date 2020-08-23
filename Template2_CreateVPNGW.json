@@ -1,0 +1,107 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "VPNClientAddressPoolPrefix": {
+            "type": "string",
+            "metadata": {
+                "description": "VPNクライアントが接続時に受け取るIPアドレスの範囲です。接続元であるオンプレミスの場所、または接続先とするVNetと重複しないプライベートIPアドレス範囲を指定してください！"
+            },
+            "defaultValue": "192.168.240.0/28"
+        },
+        "ClientVpnRootCertName": {
+            "type": "string",
+            "metadata": {
+                "description": "VPNクライアントの認証に使用されるクライアントルート証明書の名前"
+            },
+            "defaultValue": "ARCHIBUSvpnClientRootCert20200205-20500204"
+        },
+        "ClientVpnRootCertData": {
+            "type": "string",
+            "metadata": {
+                "description": "VPNクライアントの認証に使用されるクライアントルート証明書の公開データ"
+            },
+            "defaultValue": "MIIDIzCCAgugAwIBAgIQSQQqmPv6Xq5BOHU/Gac3pDANBgkqhkiG9w0BAQsFADAzMTEwLwYDVQQDDChQMlN2cG5BcmNoaWJ1czIwMDIwNUFmdGVyMzB5ZWFyc1Jvb3RDZXJ0MCAXDTIwMDIwNTA4MjkzMloYDzIwNTAwMjA1MDgzOTMxWjAzMTEwLwYDVQQDDChQMlN2cG5BcmNoaWJ1czIwMDIwNUFmdGVyMzB5ZWFyc1Jvb3RDZXJ0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt+puNoqjAcyeuqGZ6mzxGee7DG4y2xWoq/ZGK1xUS1aweSSzyRZaybp2ybf9ogj5D9PTycPRSCLROkRPT+xk6OfNFW1yVIaQLsHL0q9VZez/F8XArpK3e7vnRPF7Dr67srVX553jnNES7IfEp4MlkwTaBhi1FHFprkrNTVXyfnrJ/69tzKCYyHtyibfJXSfczOPBZW2bTWI9c28Eig6zwVXmTcihl8L3TRdqyRqRrL4sEuF/PR/t+BZU0VUA3Z3D3iPKF5OQ12yeikDSb++daW73A7UFKyLDB4ghyNI1UUG3dttFZ65P21uQePJXeRLeQ5UjjKS9EP42H5gasaPOwQIDAQABozEwLzAOBgNVHQ8BAf8EBAMCAgQwHQYDVR0OBBYEFCCRh22fdWwyuyN+pDpX/YRewcCSMA0GCSqGSIb3DQEBCwUAA4IBAQCFCSrs8pnYw6nkhZ8GSvRPJoj6139BaRNL+n2VhgaY75tYeWdCK5TDem+TG0ctQ76Cge2arl4H+VM5W+U4w5Zcqx5simhO/L59CurM/vHZFNQQdjJnmounMhUBhJcvm4ujmcBob+Z3BIwueUJUKlEmzrf/A8tIysyjWPhBpLnbdSRvwGUJZ5GF0XP+WvEvfyf4oXN+KmEyPtprxhoc+34d8V2mO0pRK7kzVrS6VFUBwUV1fO97SsoN659a5iEIPfvxsKPBqs0PpB6yjZX7ZWRHH3i8y+5o3m/PLGN+Yuc5XQzBMS7y7vXoh+8hxnQZASXmSyCNLI/7Ijq2gSz+1mAS"
+        }
+    },
+    "variables": {
+        "VirtualNetworkName": "ARCHIBUS-Vnet"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-04-01",
+            "name": "ARCHIBUS-VPNGW-ip",
+            "location": "japaneast",
+            "sku": {
+                "name": "Basic"
+            },
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": [
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworkGateways",
+            "apiVersion": "2020-04-01",
+            "name": "ARCHIBUS-VPNGW",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', 'ARCHIBUS-VPNGW-ip')]"
+            ],
+            "properties": {
+                "enablePrivateIpAddress": false,
+                "ipConfigurations": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'ARCHIBUS-VPNGW-ip')]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('VirtualNetworkName'), 'GatewaySubnet')]"
+                            }
+                        }
+                    }
+                ],
+                "sku": {
+                    "name": "Basic",
+                    "tier": "Basic"
+                },
+                "gatewayType": "Vpn",
+                "vpnType": "RouteBased",
+                "enableBgp": false,
+                "activeActive": false,
+                "vpnClientConfiguration": {
+                    "vpnClientAddressPool": {
+                        "addressPrefixes": [
+                            "[parameters('VPNClientAddressPoolPrefix')]"
+                        ]
+                    },
+                    "vpnClientProtocols": [
+                        "SSTP"
+                    ],
+                    "vpnClientRootCertificates": [
+                        {
+                            "name": "[parameters('ClientVpnRootCertName')]",
+                            "properties": {
+                                "publicCertData": "[parameters('ClientVpnRootCertData')]"
+                            }
+                        }
+                    ],
+                    "vpnClientRevokedCertificates": [
+                    ],
+                    "radiusServers": [
+                    ],
+                    "vpnClientIpsecPolicies": [
+                    ]
+                },
+                "vpnGatewayGeneration": "Generation1"
+            }
+        }
+    ]
+}

@@ -1,0 +1,299 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+    },
+    "variables": {
+        "VirtualNetworkName": "ARCHIBUS-Vnet",
+        "AddressPrefix": "10.0.0.0/16",
+        "GatewaySubnetPrefix": "10.0.0.0/24",
+        "ProdEnvVMsubnetName": "ProdEnvVMSubnet",
+        "ProdEnvVMsubnetPrefix": "10.0.1.0/24",
+        "ProdEnvAppGWSubnetName": "ProdEnvAppGWSubnet",
+        "ProdEnvAppGWSubnetPrefix": "10.0.2.0/24",
+        "DevEnvVMsubnetName": "DevEnvVMSubnet",
+        "DevEnvVMsubnetPrefix": "10.0.3.0/24",
+        "DevEnvAppGWSubnetName": "DevEnvAppGWSubnet",
+        "DevEnvAppGWSubnetPrefix": "10.0.4.0/24"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "ProdEnvAppGWSubnet-nsg",
+            "location": "japaneast",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "uneditableForAzureDefaultPorts",
+                        "properties": {
+                            "description": "この規則は削除しないでください！\nV2 SKUのアプリケーションゲートウェイのサブネットへセキュリティグループを割り当てにはAzureの65200-65535ポートへの接続を許可するのが必要される。",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "65200-65535",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 4000,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [
+                            ],
+                            "destinationPortRanges": [
+                            ],
+                            "sourceAddressPrefixes": [
+                            ],
+                            "destinationAddressPrefixes": [
+                            ]
+                        }
+                    },
+                    {
+                        "name": "editableFor443Port",
+                        "properties": {
+                            "description": "インターネットからの、サイト443ポート/HTTPSへの接続を全部許可となります。\n固定IPアドレスのみからの接続を許可する場合\n  ソース：IP Address\n  ソースIPアドレス/CIDR範囲：固定IPアドレスの範囲を指定してください。",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [
+                            ],
+                            "destinationPortRanges": [
+                            ],
+                            "sourceAddressPrefixes": [
+                            ],
+                            "destinationAddressPrefixes": [
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "DevEnvAppGWSubnet-nsg",
+            "location": "japaneast",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "uneditableForAzureDefaultPorts",
+                        "properties": {
+                            "description": "この規則は削除しないでください！\nV2 SKUのアプリケーションゲートウェイのサブネットへセキュリティグループを割り当てにはAzureの65200-65535ポートへの接続を許可するのが必要される。",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "65200-65535",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 4000,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [
+                            ],
+                            "destinationPortRanges": [
+                            ],
+                            "sourceAddressPrefixes": [
+                            ],
+                            "destinationAddressPrefixes": [
+                            ]
+                        }
+                    },
+                    {
+                        "name": "editableFor443Port",
+                        "properties": {
+                            "description": "インターネットからの、サイト443ポート/HTTPSへの接続を全部許可となります。\n固定IPアドレスのみからの接続を許可する場合\n  ソース：IP Address\n  ソースIPアドレス/CIDR範囲：固定IPアドレスの範囲を指定してください。",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [
+                            ],
+                            "destinationPortRanges": [
+                            ],
+                            "sourceAddressPrefixes": [
+                            ],
+                            "destinationAddressPrefixes": [
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('VirtualNetworkName')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', 'ProdEnvAppGWSubnet-nsg')]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', 'DevEnvAppGWSubnet-nsg')]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('AddressPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "GatewaySubnet",
+                        "properties": {
+                            "addressPrefix": "[variables('GatewaySubnetPrefix')]",
+                            "delegations": [
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "[variables('ProdEnvVMsubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('ProdEnvVMsubnetPrefix')]",
+                            "delegations": [
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "[variables('ProdEnvAppGWSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('ProdEnvAppGWSubnetPrefix')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'ProdEnvAppGWSubnet-nsg')]"
+                            },
+                            "serviceEndpoints": [
+                            ],
+                            "delegations": [
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "[variables('DevEnvVMsubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('DevEnvVMsubnetPrefix')]",
+                            "delegations": [
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "[variables('DevEnvAppGWSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('DevEnvAppGWSubnetPrefix')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'DevEnvAppGWSubnet-nsg')]"
+                            },
+                            "serviceEndpoints": [
+                            ],
+                            "delegations": [
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [
+                ],
+                "enableDdosProtection": false,
+                "enableVmProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-04-01",
+            "name": "[concat(variables('VirtualNetworkName'), '/GatewaySubnet')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('VirtualNetworkName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[variables('GatewaySubnetPrefix')]",
+                "delegations": [
+                ],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-04-01",
+            "name": "[concat(variables('VirtualNetworkName'), '/', variables('ProdEnvVMsubnetName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('VirtualNetworkName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[variables('ProdEnvVMsubnetPrefix')]",
+                "delegations": [
+                ],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-04-01",
+            "name": "[concat(variables('VirtualNetworkName'), '/', variables('ProdEnvAppGWSubnetName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('VirtualNetworkName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', 'ProdEnvAppGWSubnet-nsg')]"
+            ],
+            "properties": {
+                "addressPrefix": "[variables('ProdEnvAppGWSubnetPrefix')]",
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'ProdEnvAppGWSubnet-nsg')]"
+                },
+                "serviceEndpoints": [
+                ],
+                "delegations": [
+                ],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-04-01",
+            "name": "[concat(variables('VirtualNetworkName'), '/', variables('DevEnvVMsubnetName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('VirtualNetworkName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[variables('DevEnvVMsubnetPrefix')]",
+                "delegations": [
+                ],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-04-01",
+            "name": "[concat(variables('VirtualNetworkName'), '/', variables('DevEnvAppGWSubnetName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('VirtualNetworkName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', 'DevEnvAppGWSubnet-nsg')]"
+            ],
+            "properties": {
+                "addressPrefix": "[variables('DevEnvAppGWSubnetPrefix')]",
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'DevEnvAppGWSubnet-nsg')]"
+                },
+                "serviceEndpoints": [
+                ],
+                "delegations": [
+                ],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        }
+    ]
+}

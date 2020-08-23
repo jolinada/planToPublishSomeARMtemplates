@@ -1,0 +1,892 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachines_ArchibusVM_name": {
+            "defaultValue": "ProdEnvVM1",
+            "type": "String",
+            "metadata": {
+                "description": "仮想マシン(VM)の名前、15 文字を超えること、次の文字を含めることはできません: ~ ! @ # $ % ^ & * ( ) = + _ [ ] { } \\\\ | ; : . ' \\\" , < > / ?。"
+            }
+        },
+        "virtualMachines_ArchibusVM_adminUserName": {
+            "defaultValue": "archibusadmin",
+            "type": "String",
+            "metadata": {
+                "description": "VMの管理者アカウントのユーザ名"
+            }
+        },
+        "virtualMachines_ArchibusVM_adminUserPassword": {
+            "defaultValue": "zuogeJolin1!",
+            "type": "SecureString",
+            "metadata": {
+                "description": "VMの管理者アカウントのパスワード"
+            }
+        },
+        "virtualMachines_ArchibusVM_forRemoteRDP_dnsLabelPrefix": {
+            "defaultValue": "projectxxx-prodenvvmnumberxxx-2020mmdd",
+            "type": "String",
+            "metadata": {
+                "description": "仮想マシンRDPポートへのアクセスに使用されるコンピューター名、一意の名前である必要がある"
+            }
+        },
+        "virtualMachines_ArchibusVM_osImage": {
+            "defaultValue": "/subscriptions/53df8925-847a-4177-8b14-10d279a6cb94/resourceGroups/TESTRA-RG/providers/Microsoft.Compute/images/standardver1-image-20200625150701",
+            "allowedValues": [
+                "/subscriptions/53df8925-847a-4177-8b14-10d279a6cb94/resourceGroups/TESTRA-RG/providers/Microsoft.Compute/images/standardver1-image-20200625150701",
+                "/subscriptions/53df8925-847a-4177-8b14-10d279a6cb94/resourceGroups/TESTRA-RG/providers/Microsoft.Compute/images/SQL2019V24-image-20200622"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "ギャラリーに保管されたカスタマーズOSイメージ"
+            }
+        },
+        "virtualMachines_ArchibusVM_vmSize": {
+            "defaultValue": "Standard_B4ms",
+            "allowedValues": [
+                "Standard_B4ms",
+                "Standard_B8ms",
+                "Standard_D4s_v3",
+                "Standard_D8s_v3",
+                "Standard_DS12",
+                "Standard_DS12_v2",
+                "Standard_DS14_v2",
+                "Standard_E16-4s_v3",
+                "Standard_E16s_v3",
+                "Standard_F2s_v2",
+                "Standard_F16s",
+                "Standard_GS2",
+                "Standard_L4s"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "選択したサイズによって、VMの処理能力、メモリ、記憶域容量などの要素が決まる"
+            }
+        },
+        "virtualMachines_ArchibusVM_osDiskType": {
+            "defaultValue": "Premium_LRS",
+            "allowedValues": [
+                "StandardSSD_LRS",
+                "Premium_LRS"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "OSディスクのストレージアカウントの種類"
+            }
+        },
+        "virtualMachines_ArchibusVM_osDiskSizeGB": {
+            "defaultValue": 127,
+            "type": "int",
+            "metadata": {
+                "description": "VMのOSディスクのサイズをギガバイトで指定、1023GBを超えることはできない"
+            }
+        },
+        "virtualMachines_ArchibusVM_dataDiskType": {
+            "defaultValue": "Premium_LRS",
+            "allowedValues": [
+                "Premium_LRS"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "SQL用のDATAディスクのストレージアカウントの種類"
+            }
+        },
+        "virtualMachines_ArchibusVM_dataDiskSizeGB": {
+            "defaultValue": 128,
+            "type": "int",
+            "metadata": {
+                "description": "DATAディスクのサイズをギガバイトで指定、1023GBを超えることはできない"
+            }
+        },
+        "ExclusionsPaths": {
+            "type": "string",
+            "defaultValue": "C:\\Windows\\SoftwareDistribution\\DataStore;C:\\Windows\\security\\database;C:\\Windows\\System32\\spool;C:\\Program Files\\Microsoft SQL Server",
+            "metadata": {
+                "description": "スキャンから除外したいファイルパスをセミコロン区切りでリストする"
+            }
+        },
+        "ExclusionsExtensions": {
+            "type": "string",
+            "defaultValue": "Registry.pol;NTUser.pol;Pagefile.sys;.pst;.mdf;.ldf;.ndf;.bak;.trn",
+            "metadata": {
+                "description": "スキャンから除外したいファイル拡張子をセミコロン区切りでリストする"
+            }
+        },
+        "ExclusionsProcesses": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "スキャンから除外したいプロセス名をセミコロン区切りでリストする"
+            }
+        },
+        "ScheduledScanSettingsIsEnabled": {
+            "type": "string",
+            "defaultValue": "true",
+            "allowedValues": [
+                "true",
+                "false"
+            ],
+            "metadata": {
+                "description": "スケジュールスキャンを有効にするか"
+            }
+        },
+        "ScheduledScanSettingsScanType": {
+            "type": "string",
+            "defaultValue": "Full",
+            "allowedValues": [
+                "Full",
+                "Quick"
+            ],
+            "metadata": {
+                "description": "スケジュールされたスキャンに使用するスキャンの種類"
+            }
+        },
+        "ScheduledScanSettingsDay": {
+            "type": "string",
+            "defaultValue": "0",
+            "metadata": {
+                "description": "スケジュールされたスキャンを実行する曜日 (0-毎日, 1-日曜, 2-月曜, ..., 7-土曜)"
+            }
+        },
+        "ScheduledScanSettingsTime": {
+            "type": "string",
+            "defaultValue": "420",
+            "metadata": {
+                "description": "スケジュールされたスキャンを実行する時刻を午前0時からの分数(0-1440)で指定する　例：0=12AM, 60=1AM, 120=2AM..."
+            }
+        },
+        "sqlAutopatchingDayOfWeek": {
+            "type": "string",
+            "defaultValue": "Saturday",
+            "metadata": {
+                "description": "自動更新のスケジュール：毎日、月曜日、火曜日、水曜日、木曜日、金曜日、土曜日、日曜日"
+            }
+        },
+        "sqlAutopatchingStartHour": {
+            "type": "string",
+            "defaultValue": "6",
+            "metadata": {
+                "description": "仮想マシンを更新するローカルの開始時刻：0 ～ 24"
+            }
+        },
+        "sqlAutopatchingWindowDuration": {
+            "type": "string",
+            "defaultValue": "60",
+            "metadata": {
+                "description": "更新プログラムのダウンロードとインストールを完了するのに許可されている時間 (分単位)"
+            }
+        },
+        "applicationGatewaywithWAF": {
+            "type": "string",
+            "allowedValues": [
+                "WAF_v2",
+                "Standard_v2"
+            ],
+            "defaultValue": "WAF_v2",
+            "metadata": {
+                "description": "ファイアウォール機能付きのアプリケーションゲートウェイは「WAF_v2」を選択、ファイアウォール要らない場合は「Standard_v2」を選択する"
+            }
+        },
+        "applicationGateways_AppGW_name": {
+            "defaultValue": "ProdEnvAppGW",
+            "type": "String",
+            "metadata": {
+                "description": "アプリケーションゲートウェイの名前"
+            }
+        },
+        "applicationGateways_AppGW_FrontDomainName": {
+            "defaultValue": "projectprodsitedomain",
+            "type": "String",
+            "metadata": {
+                "description": "アプリケーションゲートウェイフロントエンドのDNS名の例：projectprodsitedomain.japaneast.cloudapp.azure.com"
+            }
+        },
+        "applicationGateways_AppGW_capacity": {
+            "defaultValue": 2,
+            "type": "Int",
+            "metadata": {
+                "description": "自動スケールの際、最大スケールユニットの数値: 2 ～ 125"
+            }
+        },
+        "applicationGateways_AppGW_certData": {
+            "type": "String",
+            "metadata": {
+                "description": "HTTPSのサーバ証明書(Base-64でエンコードされた.pfxファイル)のデータ"
+            }
+        },
+        "applicationGateways_AppGW_certPassword": {
+            "type": "SecureString",
+            "metadata": {
+                "description": "HTTPSのサーバ証明書のパスワード"
+            }
+        },
+        "WAFMode": {
+            "type": "string",
+            "allowedValues": [
+                "Detection",
+                "Prevention"
+            ],
+            "defaultValue": "Prevention",
+            "metadata": {
+                "description": "ファイアウォール機能ある場合のみ入力！\r\nファイアウォール規則によって検出される侵入および攻撃をブロックするには「Prevention」モードを選択、脅威アラートを監視およびログに記録するには「Detection」モードを選択する"
+            }
+        },
+        "WAFfileUploadLimitInMb": {
+            "type": "int",
+            "defaultValue": 750,
+            "metadata": {
+                "description": "ファイアウォール機能ある場合のみ入力！\r\nファイルアップロードの上限(MB)：1MB ~ 750MB"
+            }
+        }
+    },
+    "variables": {
+        "VMsubnetName": "ProdEnvVMSubnet",
+        "AppGWSubnetName": "ProdEnvAppGWSubnet",
+        "AddressPrefix": "10.0.0.0/16",
+        "VirtualNetworkName": "ARCHIBUS-Vnet",
+        "StorageAccountName": "[concat(uniquestring(resourceGroup().id), '0archibus')]",
+        "AppGWsubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('VirtualNetworkName'), variables('AppGWSubnetName'))]",
+        "AppGWpublicIPAddressName": "[concat(parameters('applicationGateways_AppGW_name'), '-ip')]",
+        "AppGWpublicIPRef": "[resourceId('Microsoft.Network/publicIPAddresses', variables('AppGWpublicIPAddressName'))]",
+        "WAF_applicationGateways_AppGW_name": "[concat(parameters('applicationGateways_AppGW_name'), '-WAF')]",
+        "WAF_ApplicationGatewayID": "[resourceId('Microsoft.Network/applicationGateways',variables('WAF_applicationGateways_AppGW_name'))]",
+        "ApplicationGatewayID": "[resourceId('Microsoft.Network/applicationGateways',parameters('applicationGateways_AppGW_name'))]",
+        "ApplicationGatewaySSLcertName": "ARCHIBUS-SSLCert-01",
+        "ApplicationGatewayListenerName": "ARCHIBUS-Listener-01",
+        "ApplicationGatewayPoolsName": "ARCHIBUS-BackendPool-01",
+        "ApplicationGatewayCollectionName": "ARCHIBUS-BackendHttpSetting-01",
+        "ApplicationGatewayRoutingRuleName": "ARCHIBUS-Rule-01",
+        "ApplicationGatewayProbeName": "ARCHIBUS-Probe-01",
+        "VMsubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('VirtualNetworkName'), variables('VMsubnetName'))]",
+        "VMpublicIPAddressName": "[concat(parameters('virtualMachines_ArchibusVM_name'), '-ip')]",
+        "VMnicName": "[concat(parameters('virtualMachines_ArchibusVM_name'), '-nic')]",
+        "VMnetworkSecurityGroupName": "[concat(parameters('virtualMachines_ArchibusVM_name'), '-nsg')]",
+        "ApplicationGatewayUniqName": "[if(equals(toLower(parameters('applicationGatewaywithWAF')), 'waf_v2'),  variables('WAF_applicationGateways_AppGW_name'), parameters('applicationGateways_AppGW_name'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('VMnetworkSecurityGroupName')]",
+            "location": "japaneast",
+            "tags": {
+                "Environment": "[parameters('virtualMachines_ArchibusVM_name')]"
+            },
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "allow-RemoteConnectiontoRDPport",
+                        "properties": {
+                            "description": "・インターネットからの接続を許可する場合\n  ソース：Any\n  ソースIPアドレス/CIDR範囲：*\n・VPNのみ接続を許可する場合\n  ソース：IP Address\n  ソースIPアドレス/CIDR範囲：[variables('AddressPrefix')]。",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "[variables('AddressPrefix')]",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 1000,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [
+                            ],
+                            "destinationPortRanges": [
+                            ],
+                            "sourceAddressPrefixes": [
+                            ],
+                            "destinationAddressPrefixes": [
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "name": "[variables('StorageAccountName')]",
+            "location": "japaneast",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "largeFileSharesState": "Disabled",
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [
+                    ],
+                    "ipRules": [
+                    ],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Hot"
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('VMpublicIPAddressName')]",
+            "location": "japaneast",
+            "tags": {
+                "Environment": "[parameters('virtualMachines_ArchibusVM_name')]"
+            },
+            "sku": {
+                "name": "Basic"
+            },
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4,
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('virtualMachines_ArchibusVM_forRemoteRDP_dnsLabelPrefix')]"
+                },
+                "ipTags": [
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('AppGWpublicIPAddressName')]",
+            "location": "japaneast",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('applicationGateways_AppGW_FrontDomainName')]"
+                },
+                "ipTags": [
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('VMnicName')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('VMpublicIPAddressName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('VMnetworkSecurityGroupName'))]",
+                "[resourceId('Microsoft.Network/applicationGateways', variables('ApplicationGatewayUniqName'))]"
+            ],
+            "tags": {
+                "Environment": "[parameters('virtualMachines_ArchibusVM_name')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('VMpublicIPAddressName'))]"
+                            },
+                            "subnet": {
+                                "id": "[variables('VMsubnetRef')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4",
+                            "applicationGatewayBackendAddressPools": [
+                                {
+                                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', variables('ApplicationGatewayUniqName')), '/backendAddressPools/', variables('ApplicationGatewayPoolsName'))]"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": [
+                    ]
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('VMnetworkSecurityGroupName'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-07-01",
+            "name": "[parameters('virtualMachines_ArchibusVM_name')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/', variables('StorageAccountName'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces/', variables('VMnicName'))]"
+            ],
+            "tags": {
+                "Environment": "[parameters('virtualMachines_ArchibusVM_name')]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachines_ArchibusVM_vmSize')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[parameters('virtualMachines_ArchibusVM_osImage')]"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('virtualMachines_ArchibusVM_osDiskType')]"
+                        },
+                        "diskSizeGB": "[parameters('virtualMachines_ArchibusVM_osDiskSizeGB')]"
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            "createOption": "FromImage",
+                            "caching": "ReadOnly",
+                            "managedDisk": {
+                                "storageAccountType": "[parameters('virtualMachines_ArchibusVM_dataDiskType')]"
+                            },
+                            "diskSizeGB": "[parameters('virtualMachines_ArchibusVM_dataDiskSizeGB')]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_ArchibusVM_name')]",
+                    "adminUsername": "[parameters('virtualMachines_ArchibusVM_adminUserName')]",
+                    "adminPassword": "[parameters('virtualMachines_ArchibusVM_adminUserPassword')]",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true,
+                        "timeZone": "Tokyo Standard Time"
+                    },
+                    "secrets": [
+                    ],
+                    "allowExtensionOperations": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces/', variables('VMnicName'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[concat('https://', variables('StorageAccountName'), '.blob.core.windows.net/')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.SqlVirtualMachine/sqlVirtualMachines",
+            "apiVersion": "2017-03-01-preview",
+            "name": "[parameters('virtualMachines_ArchibusVM_name')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ArchibusVM_name'))]"
+            ],
+            "properties": {
+                "virtualMachineResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ArchibusVM_name'))]",
+                "sqlManagement": "Full",
+                "SqlServerLicenseType": "PAYG",
+                "sqlImageSku": "Standard",
+                "AutoPatchingSettings": {
+                    "Enable": true,
+                    "DayOfWeek": "[parameters('sqlAutopatchingDayOfWeek')]",
+                    "MaintenanceWindowStartingHour": "[parameters('sqlAutopatchingStartHour')]",
+                    "MaintenanceWindowDuration": "[parameters('sqlAutopatchingWindowDuration')]"
+                },
+                "KeyVaultCredentialSettings": {
+                    "Enable": false,
+                    "CredentialName": ""
+                },
+                "StorageConfigurationSettings": {
+                    "StorageWorkloadType": "GENERAL",
+                    "SQLDataSettings": {
+                        "LUNs": [
+                            0
+                        ]
+                    },
+                    "SQLLogSettings": {
+                        "LUNs": [
+                            0
+                        ]
+                    },
+                    "SQLTempDbSettings": {
+                        "Status": "LocalSSD"
+                    }
+                },
+                "ServerConfigurationsManagementSettings": {
+                    "SQLConnectivityUpdateSettings": {
+                        "ConnectivityType": "PRIVATE",
+                        "Port": 1433,
+                        "SQLAuthUpdateUserName": "archibusadmin",
+                        "SQLAuthUpdatePassword": "zuogeJolin1!"
+                    },
+                    "AdditionalFeaturesServerConfigurations": {
+                        "IsRServicesEnabled": false
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2019-07-01",
+            "name": "[concat(parameters('virtualMachines_ArchibusVM_name'), '/IaaSAntimalware')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ArchibusVM_name'))]"
+            ],
+            "tags": {
+                "Environment": "[parameters('virtualMachines_ArchibusVM_name')]"
+            },
+            "properties": {
+                "autoUpgradeMinorVersion": true,
+                "publisher": "Microsoft.Azure.Security",
+                "type": "IaaSAntimalware",
+                "typeHandlerVersion": "1.5",
+                "settings": {
+                    "AntimalwareEnabled": "true",
+                    "RealtimeProtectionEnabled": "true",
+                    "Exclusions": {
+                        "Extensions": "[parameters('ExclusionsExtensions')]",
+                        "Paths": "[parameters('ExclusionsPaths')]",
+                        "Processes": "[parameters('ExclusionsProcesses')]"
+                    },
+                    "ScheduledScanSettings": {
+                        "isEnabled": "[parameters('ScheduledScanSettingsIsEnabled')]",
+                        "day": "[parameters('ScheduledScanSettingsDay')]",
+                        "time": "[parameters('ScheduledScanSettingsTime')]",
+                        "scanType": "[parameters('ScheduledScanSettingsScanType')]"
+                    }
+                }
+            }
+        },
+        {
+            "condition": "[equals(parameters('applicationGatewaywithWAF'),'Standard_v2')]",
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('applicationGateways_AppGW_name')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('AppGWpublicIPAddressName'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "[parameters('applicationGatewaywithWAF')]",
+                    "tier": "[parameters('applicationGatewaywithWAF')]"
+                },
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "AppGWIPConfig",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('AppGWsubnetRef')]"
+                            }
+                        }
+                    }
+                ],
+                "sslCertificates": [
+                    {
+                        "name": "[variables('ApplicationGatewaySSLcertName')]",
+                        "properties": {
+                            "data": "[parameters('applicationGateways_AppGW_certData')]",
+                            "password": "[parameters('applicationGateways_AppGW_certPassword')]"
+                        }
+                    }
+                ],
+                "trustedRootCertificates": [
+                ],
+                "frontendIPConfigurations": [
+                    {
+                        "name": "FrontendIPConfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[variables('AppGWpublicIPRef')]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "port_443",
+                        "properties": {
+                            "port": 443
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('ApplicationGatewayPoolsName')]",
+                        "properties": {
+                            "backendAddresses": [
+                            ]
+                        }
+                    }
+                ],
+                "backendHttpSettingsCollection": [
+                    {
+                        "name": "[variables('ApplicationGatewayCollectionName')]",
+                        "properties": {
+                            "port": 8080,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Disabled",
+                            "connectionDraining": {
+                                "enabled": true,
+                                "drainTimeoutInSec": 60
+                            },
+                            "pickHostNameFromBackendAddress": false,
+                            "requestTimeout": 20
+                        }
+                    }
+                ],
+                "httpListeners": [
+                    {
+                        "name": "[variables('ApplicationGatewayListenerName')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('ApplicationGatewayID'), '/frontendIPConfigurations/FrontendIPConfig')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(variables('ApplicationGatewayID'), '/frontendPorts/port_443')]"
+                            },
+                            "protocol": "Https",
+                            "SslCertificate": {
+                                "Id": "[concat(variables('ApplicationGatewayID'), '/sslCertificates/', variables('ApplicationGatewaySSLcertName'))]"
+                            },
+
+                            "hostNames": [
+                            ],
+                            "requireServerNameIndication": false
+                        }
+                    }
+                ],
+                "urlPathMaps": [
+                ],
+                "requestRoutingRules": [
+                    {
+                        "name": "[variables('ApplicationGatewayRoutingRuleName')]",
+                        "properties": {
+                            "ruleType": "Basic",
+                            "httpListener": {
+                                "id": "[concat(variables('ApplicationGatewayID'), '/httpListeners/', variables('ApplicationGatewayListenerName'))]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[concat(variables('ApplicationGatewayID'), '/backendAddressPools/', variables('ApplicationGatewayPoolsName'))]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[concat(variables('ApplicationGatewayID'), '/backendHttpSettingsCollection/', variables('ApplicationGatewayCollectionName'))]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "[variables('ApplicationGatewayProbeName')]",
+                        "properties": {
+                            "protocol": "Http",
+                            "path": "/archibus/login.axvw",
+                            "interval": 30,
+                            "timeout": 30,
+                            "unhealthyThreshold": 3,
+                            "pickHostNameFromBackendHttpSettings": true,
+                            "minServers": 0,
+                            "match": {
+                                "statusCodes": [
+                                    "200-399"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "rewriteRuleSets": [
+                ],
+                "redirectConfigurations": [
+                ],
+                "enableHttp2": true,
+                "autoscaleConfiguration": {
+                    "minCapacity": 1,
+                    "maxCapacity": "[parameters('applicationGateways_AppGW_capacity')]"
+                }
+            }
+        },
+        {
+            "condition": "[equals(parameters('applicationGatewaywithWAF'),'WAF_v2')]",
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2020-04-01",
+            "name": "[variables('WAF_applicationGateways_AppGW_name')]",
+            "location": "japaneast",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('AppGWpublicIPAddressName'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "[parameters('applicationGatewaywithWAF')]",
+                    "tier": "[parameters('applicationGatewaywithWAF')]"
+                },
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "AppGWIPConfig",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('AppGWsubnetRef')]"
+                            }
+                        }
+                    }
+                ],
+                "sslCertificates": [
+                    {
+                        "name": "[variables('ApplicationGatewaySSLcertName')]",
+                        "properties": {
+                            "data": "[parameters('applicationGateways_AppGW_certData')]",
+                            "password": "[parameters('applicationGateways_AppGW_certPassword')]"
+                        }
+                    }
+                ],
+                "trustedRootCertificates": [
+                ],
+                "frontendIPConfigurations": [
+                    {
+                        "name": "FrontendIPConfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[variables('AppGWpublicIPRef')]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "port_443",
+                        "properties": {
+                            "port": 443
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('ApplicationGatewayPoolsName')]",
+                        "properties": {
+                            "backendAddresses": [
+                            ]
+                        }
+                    }
+                ],
+                "backendHttpSettingsCollection": [
+                    {
+                        "name": "[variables('ApplicationGatewayCollectionName')]",
+                        "properties": {
+                            "port": 8080,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Disabled",
+                            "connectionDraining": {
+                                "enabled": true,
+                                "drainTimeoutInSec": 60
+                            },
+                            "pickHostNameFromBackendAddress": false,
+                            "requestTimeout": 20
+                        }
+                    }
+                ],
+                "httpListeners": [
+                    {
+                        "name": "[variables('ApplicationGatewayListenerName')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('WAF_ApplicationGatewayID'), '/frontendIPConfigurations/FrontendIPConfig')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(variables('WAF_ApplicationGatewayID'), '/frontendPorts/port_443')]"
+                            },
+                            "protocol": "Https",
+                            "SslCertificate": {
+                                "Id": "[concat(variables('WAF_ApplicationGatewayID'), '/sslCertificates/', variables('ApplicationGatewaySSLcertName'))]"
+                            },
+
+                            "hostNames": [
+                            ],
+                            "requireServerNameIndication": false
+                        }
+                    }
+                ],
+                "urlPathMaps": [
+                ],
+                "requestRoutingRules": [
+                    {
+                        "name": "[variables('ApplicationGatewayRoutingRuleName')]",
+                        "properties": {
+                            "ruleType": "Basic",
+                            "httpListener": {
+                                "id": "[concat(variables('WAF_ApplicationGatewayID'), '/httpListeners/', variables('ApplicationGatewayListenerName'))]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[concat(variables('WAF_ApplicationGatewayID'), '/backendAddressPools/', variables('ApplicationGatewayPoolsName'))]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[concat(variables('WAF_ApplicationGatewayID'), '/backendHttpSettingsCollection/', variables('ApplicationGatewayCollectionName'))]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "[variables('ApplicationGatewayProbeName')]",
+                        "properties": {
+                            "protocol": "Http",
+                            "path": "/archibus/login.axvw",
+                            "interval": 30,
+                            "timeout": 30,
+                            "unhealthyThreshold": 3,
+                            "pickHostNameFromBackendHttpSettings": true,
+                            "minServers": 0,
+                            "match": {
+                                "statusCodes": [
+                                    "200-399"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "rewriteRuleSets": [
+                ],
+                "redirectConfigurations": [
+                ],
+                "webApplicationFirewallConfiguration": {
+                    "enabled": true,
+                    "firewallMode": "[parameters('WAFMode')]",
+                    "ruleSetType": "OWASP",
+                    "ruleSetVersion": "3.1",
+                    "disabledRuleGroups": [
+                    ],
+                    "exclusions": [
+                    ],
+                    "requestBodyCheck": false,
+                    "maxRequestBodySizeInKb": 128,
+                    "fileUploadLimitInMb": "[parameters('WAFfileUploadLimitInMb')]"
+                },
+                "enableHttp2": true,
+                "autoscaleConfiguration": {
+                    "minCapacity": 1,
+                    "maxCapacity": "[parameters('applicationGateways_AppGW_capacity')]"
+                }
+            }
+        }
+    ]
+}
